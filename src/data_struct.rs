@@ -6,10 +6,16 @@ enum VariableTypes {
 }
 
 #[derive(Debug, PartialEq)]
-enum Variable {
+enum Constant {
 	Bool(bool),
 	Number(i32),
 	String(String),
+}
+
+#[derive(Debug, PartialEq)]
+enum Identifier {
+	Constant(Constant),
+	Variable { name: String },
 }
 
 #[derive(Debug, PartialEq)]
@@ -76,7 +82,7 @@ impl Operator {
 #[derive(Debug, PartialEq)]
 enum Token {
 	Parenthesis(char),
-	Operand(Variable),
+	Operand(Identifier),
 	Operation(Operator),
 }
 
@@ -102,7 +108,16 @@ impl Token {
 					number.push(expr.chars().nth(i).unwrap());
 					i += 1;
 				}
-				tokens.push(Token::Operand(Variable::Number(number.parse().unwrap())));
+				tokens.push(Token::Operand(Identifier::Constant(Constant::Number(number.parse().unwrap()))));
+			} else if c == '"' {
+				let mut string = String::new();
+				i += 1;
+				while i < expr.len() && expr.chars().nth(i).unwrap() != '"' {
+					string.push(expr.chars().nth(i).unwrap());
+					i += 1;
+				}
+				tokens.push(Token::Operand(Identifier::Constant(Constant::String(string))));
+				i += 1;
 			} else if c.is_alphabetic() {
 				let mut string = c.to_string();
 				i += 1;
@@ -110,7 +125,7 @@ impl Token {
 					string.push(expr.chars().nth(i).unwrap());
 					i += 1;
 				}
-				tokens.push(Token::Operand(Variable::String(string)));
+				tokens.push(Token::Operand(Identifier::Variable { name: string }));
 			} else if c == '(' || c == ')' {
 				tokens.push(Token::Parenthesis(c));
 				i += 1;
@@ -193,7 +208,7 @@ fn expr_tokens_to_rpn(tokens: Vec<Token>) -> Vec<Token> {
 	return output;
 }
 
-fn evaluate_rpn(tokens: Vec<Token>) -> Variable {
+fn evaluate_rpn(tokens: Vec<Token>) -> Identifier {
 	let mut stack = Vec::new();
 	for token in tokens {
 		match token {
@@ -204,8 +219,12 @@ fn evaluate_rpn(tokens: Vec<Token>) -> Variable {
 					ArityAndTypes::Unary(_) => {
 						let operand = stack.pop().unwrap();
 						match (&op, &operand) {
-							(Operator::UnaryMinus, Variable::Number(n)) => stack.push(Variable::Number(-n)),
-							(Operator::Not, Variable::Bool(b)) => stack.push(Variable::Bool(!b)),
+							(Operator::UnaryMinus, Identifier::Constant(Constant::Number(n))) => {
+								stack.push(Identifier::Constant(Constant::Number(-n)))
+							}
+							(Operator::Not, Identifier::Constant(Constant::Bool(b))) => {
+								stack.push(Identifier::Constant(Constant::Bool(!b)))
+							}
 							_ => panic!("Invalid unary operation {:?} {:?}", op, operand),
 						}
 					}
@@ -213,13 +232,36 @@ fn evaluate_rpn(tokens: Vec<Token>) -> Variable {
 						let operand2 = stack.pop().unwrap();
 						let operand1 = stack.pop().unwrap();
 						match (&op, &operand1, &operand2) {
-							(Operator::Addition, Variable::Number(n1), Variable::Number(n2)) => stack.push(Variable::Number(n1 + n2)),
-							(Operator::Substraction, Variable::Number(n1), Variable::Number(n2)) => stack.push(Variable::Number(n1 - n2)),
-							(Operator::Multiplication, Variable::Number(n1), Variable::Number(n2)) => stack.push(Variable::Number(n1 * n2)),
-							(Operator::Division, Variable::Number(n1), Variable::Number(n2)) => stack.push(Variable::Number(n1 / n2)),
-							(Operator::Equals, Variable::Number(n1), Variable::Number(n2)) => stack.push(Variable::Bool(n1 == n2)),
-							(Operator::And, Variable::Bool(b1), Variable::Bool(b2)) => stack.push(Variable::Bool(*b1 && *b2)),
-							(Operator::Or, Variable::Bool(b1), Variable::Bool(b2)) => stack.push(Variable::Bool(*b1 || *b2)),
+							(
+								Operator::Addition,
+								Identifier::Constant(Constant::Number(n1)),
+								Identifier::Constant(Constant::Number(n2)),
+							) => stack.push(Identifier::Constant(Constant::Number(n1 + n2))),
+							(
+								Operator::Substraction,
+								Identifier::Constant(Constant::Number(n1)),
+								Identifier::Constant(Constant::Number(n2)),
+							) => stack.push(Identifier::Constant(Constant::Number(n1 - n2))),
+							(
+								Operator::Multiplication,
+								Identifier::Constant(Constant::Number(n1)),
+								Identifier::Constant(Constant::Number(n2)),
+							) => stack.push(Identifier::Constant(Constant::Number(n1 * n2))),
+							(
+								Operator::Division,
+								Identifier::Constant(Constant::Number(n1)),
+								Identifier::Constant(Constant::Number(n2)),
+							) => stack.push(Identifier::Constant(Constant::Number(n1 / n2))),
+							(Operator::Equals, Identifier::Constant(Constant::Number(n1)), Identifier::Constant(Constant::Number(n2))) => {
+								stack.push(Identifier::Constant(Constant::Bool(n1 == n2)))
+							}
+							(Operator::And, Identifier::Constant(Constant::Bool(b1)), Identifier::Constant(Constant::Bool(b2))) => {
+								stack.push(Identifier::Constant(Constant::Bool(*b1 && *b2)))
+							}
+							(Operator::Or, Identifier::Constant(Constant::Bool(b1)), Identifier::Constant(Constant::Bool(b2))) => {
+								stack.push(Identifier::Constant(Constant::Bool(*b1 || *b2)))
+							}
+
 							_ => panic!("Invalid binary operation {:?} {:?} {:?}", op, operand1, operand2),
 						}
 					}
@@ -234,9 +276,12 @@ fn evaluate_rpn(tokens: Vec<Token>) -> Variable {
 fn print_tokens(tokens: Vec<Token>) {
 	for token in tokens {
 		match token {
-			Token::Operand(Variable::Bool(b)) => print!("{} ", b),
-			Token::Operand(Variable::Number(n)) => print!("{} ", n),
-			Token::Operand(Variable::String(s)) => print!("{} ", s),
+			Token::Operand(Identifier::Constant(c)) => match c {
+				Constant::Bool(b) => print!("{} ", b),
+				Constant::Number(n) => print!("{} ", n),
+				Constant::String(s) => print!("{} ", s),
+			},
+			Token::Operand(Identifier::Variable { name }) => print!("{} ", name),
 			Token::Operation(op) => print!("{:?} ", op),
 			Token::Parenthesis(p) => print!("{:?} ", p),
 		}
@@ -259,12 +304,12 @@ mod tests {
 				Token::Operation(Operator::Not),
 				Token::Parenthesis('('),
 				Token::Parenthesis('('),
-				Token::Operand(Variable::String("a".to_string())), // TODO : count a as a variable, not a string
+				Token::Operand(Identifier::Variable { name: "a".to_string() }),
 				Token::Operation(Operator::Addition),
-				Token::Operand(Variable::Number(5)),
+				Token::Operand(Identifier::Constant(Constant::Number(5))),
 				Token::Parenthesis(')'),
 				Token::Operation(Operator::Equals),
-				Token::Operand(Variable::String("c".to_string())),
+				Token::Operand(Identifier::Variable { name: "c".to_string() }),
 				Token::Parenthesis(')'),
 			]
 		);
@@ -276,7 +321,10 @@ mod tests {
 		let tokens = Token::from_string(expression);
 		assert_eq!(
 			tokens,
-			vec![Token::Operation(Operator::UnaryMinus), Token::Operand(Variable::Number(5)),]
+			vec![
+				Token::Operation(Operator::UnaryMinus),
+				Token::Operand(Identifier::Constant(Constant::Number(5)))
+			]
 		);
 	}
 
@@ -287,10 +335,10 @@ mod tests {
 		assert_eq!(
 			tokens,
 			vec![
-				Token::Operand(Variable::Number(5)),
+				Token::Operand(Identifier::Constant(Constant::Number(5))),
 				Token::Operation(Operator::Multiplication),
 				Token::Operation(Operator::UnaryMinus),
-				Token::Operand(Variable::Number(5)),
+				Token::Operand(Identifier::Constant(Constant::Number(5)))
 			]
 		);
 	}
@@ -302,11 +350,11 @@ mod tests {
 		assert_eq!(
 			tokens,
 			vec![
-				Token::Operand(Variable::String("a".to_string())),
+				Token::Operand(Identifier::Variable { name: "a".to_string() }),
 				Token::Operation(Operator::Addition),
-				Token::Operand(Variable::Number(5)),
+				Token::Operand(Identifier::Constant(Constant::Number(5))),
 				Token::Operation(Operator::Addition),
-				Token::Operand(Variable::String("b".to_string())),
+				Token::Operand(Identifier::Variable { name: "b".to_string() }),
 			]
 		);
 	}
@@ -314,19 +362,19 @@ mod tests {
 	#[test]
 	fn test_expr_tokens_to_rpn() {
 		let tokens = vec![
-			Token::Operand(Variable::Number(5)),
+			Token::Operand(Identifier::Constant(Constant::Number(5))),
 			Token::Operation(Operator::Addition),
-			Token::Operand(Variable::Number(3)),
+			Token::Operand(Identifier::Constant(Constant::Number(3))),
 			Token::Operation(Operator::Multiplication),
-			Token::Operand(Variable::Number(2)),
+			Token::Operand(Identifier::Constant(Constant::Number(2))),
 		];
 		let rpn = expr_tokens_to_rpn(tokens);
 		assert_eq!(
 			rpn,
 			vec![
-				Token::Operand(Variable::Number(5)),
-				Token::Operand(Variable::Number(3)),
-				Token::Operand(Variable::Number(2)),
+				Token::Operand(Identifier::Constant(Constant::Number(5))),
+				Token::Operand(Identifier::Constant(Constant::Number(3))),
+				Token::Operand(Identifier::Constant(Constant::Number(2))),
 				Token::Operation(Operator::Multiplication),
 				Token::Operation(Operator::Addition),
 			]
@@ -339,6 +387,6 @@ mod tests {
 		let tokens = Token::from_string(expr);
 		let rpn = expr_tokens_to_rpn(tokens);
 		let result = evaluate_rpn(rpn);
-		assert_eq!(result, Variable::Number(11));
+		assert_eq!(result, Identifier::Constant(Constant::Number(11)));
 	}
 }
