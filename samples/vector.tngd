@@ -1,0 +1,52 @@
+DataStruct IntVector {
+    Constructors {
+        IntVector_new()
+    }
+    Destructors {
+        IntVector_free(&$self)
+    }
+    Meta {
+        sorted: bool = true
+    }
+    Calls {
+        IntVector_push_back(&$self, ...) {
+            Does { 
+                sorted = false
+            }
+        }
+
+        IntVector_sort(&$self) {
+            Does { 
+                sorted = true
+            }
+        }
+
+        IntVector_search(&$self, ...) {
+            Warn { 
+                {
+                    Test: sorted == true,
+                    Message: "Using search on an sorted vector is very inefficient",
+                    Hint: "Use IntVector_binary_search(&$self, ...) instead"                
+                }
+            }
+        }
+
+        IntVector_binary_search(&$self, ...) {
+            Denies {
+                {
+                    Test: sorted == false,
+                    Message: "Using search_sorted on an unsorted vector will not work",
+                    Hint: "Use IntVector_sort(&$self) before calling IntVector_binary_search(&$self, ...), or use IntVector_search(&$self, ...) instead"
+                }
+            }
+        }
+
+        compare_ints(...) {
+            Denies { 
+                {
+                    Message: "compare_ints was not meant to be called directly"
+                }
+            }
+        }
+    }
+}
