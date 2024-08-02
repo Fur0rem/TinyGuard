@@ -21,13 +21,13 @@ impl FileLine {
 
 #[derive(Debug)]
 pub struct Bracketed {
-	pub beginning_line: FileLine,
-	pub ending_line: FileLine,
+	beginning_line: FileLine,
+	ending_line: FileLine,
 	pub content: Either<String, Vec<Bracketed>>,
 }
 
 impl Bracketed {
-	pub fn new(beginning_line: FileLine, ending_line: FileLine, content: Either<String, Vec<Bracketed>>) -> Bracketed {
+	fn new(beginning_line: FileLine, ending_line: FileLine, content: Either<String, Vec<Bracketed>>) -> Bracketed {
 		Bracketed {
 			beginning_line,
 			ending_line,
