@@ -154,6 +154,97 @@ impl Token {
 	}
 }
 
+fn expr_tokens_to_rpn(tokens: Vec<Token>) -> Vec<Token> {
+	let mut output = Vec::new();
+	let mut stack = Vec::new();
+	for token in tokens {
+		match token {
+			Token::Operand(_) => output.push(token),
+			Token::Operation(ref op) => {
+				while let Some(&ref top) = stack.last() {
+					if let Token::Operation(top_op) = top {
+						if top_op.priority() >= op.priority() {
+							output.push(stack.pop().unwrap());
+						} else {
+							break;
+						}
+					} else {
+						break;
+					}
+				}
+				stack.push(token);
+			}
+			Token::Parenthesis('(') => stack.push(token),
+			Token::Parenthesis(')') => {
+				while let Some(top) = stack.pop() {
+					if let Token::Parenthesis('(') = top {
+						break;
+					} else {
+						output.push(top);
+					}
+				}
+			}
+			_ => panic!("Unknown token {:?}", token),
+		}
+	}
+	while let Some(top) = stack.pop() {
+		output.push(top);
+	}
+	return output;
+}
+
+fn evaluate_rpn(tokens: Vec<Token>) -> Variable {
+	let mut stack = Vec::new();
+	for token in tokens {
+		match token {
+			Token::Operand(operand) => stack.push(operand),
+			Token::Operation(op) => {
+				let arity_and_types = op.arity_and_types();
+				match arity_and_types {
+					ArityAndTypes::Unary(_) => {
+						let operand = stack.pop().unwrap();
+						match (&op, &operand) {
+							(Operator::UnaryMinus, Variable::Number(n)) => stack.push(Variable::Number(-n)),
+							(Operator::Not, Variable::Bool(b)) => stack.push(Variable::Bool(!b)),
+							_ => panic!("Invalid unary operation {:?} {:?}", op, operand),
+						}
+					}
+					ArityAndTypes::Binary(_, _) => {
+						let operand2 = stack.pop().unwrap();
+						let operand1 = stack.pop().unwrap();
+						match (&op, &operand1, &operand2) {
+							(Operator::Addition, Variable::Number(n1), Variable::Number(n2)) => stack.push(Variable::Number(n1 + n2)),
+							(Operator::Substraction, Variable::Number(n1), Variable::Number(n2)) => stack.push(Variable::Number(n1 - n2)),
+							(Operator::Multiplication, Variable::Number(n1), Variable::Number(n2)) => stack.push(Variable::Number(n1 * n2)),
+							(Operator::Division, Variable::Number(n1), Variable::Number(n2)) => stack.push(Variable::Number(n1 / n2)),
+							(Operator::Equals, Variable::Number(n1), Variable::Number(n2)) => stack.push(Variable::Bool(n1 == n2)),
+							(Operator::And, Variable::Bool(b1), Variable::Bool(b2)) => stack.push(Variable::Bool(*b1 && *b2)),
+							(Operator::Or, Variable::Bool(b1), Variable::Bool(b2)) => stack.push(Variable::Bool(*b1 || *b2)),
+							_ => panic!("Invalid binary operation {:?} {:?} {:?}", op, operand1, operand2),
+						}
+					}
+				}
+			}
+			_ => panic!("Invalid token {:?}", token),
+		}
+	}
+	return stack.pop().unwrap();
+}
+
+fn print_tokens(tokens: Vec<Token>) {
+	for token in tokens {
+		match token {
+			Token::Operand(Variable::Bool(b)) => print!("{} ", b),
+			Token::Operand(Variable::Number(n)) => print!("{} ", n),
+			Token::Operand(Variable::String(s)) => print!("{} ", s),
+			Token::Operation(op) => print!("{:?} ", op),
+			Token::Parenthesis(p) => print!("{:?} ", p),
+		}
+		print!(" ");
+	}
+	println!();
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -168,7 +259,7 @@ mod tests {
 				Token::Operation(Operator::Not),
 				Token::Parenthesis('('),
 				Token::Parenthesis('('),
-				Token::Operand(Variable::String("a".to_string())),
+				Token::Operand(Variable::String("a".to_string())), // TODO : count a as a variable, not a string
 				Token::Operation(Operator::Addition),
 				Token::Operand(Variable::Number(5)),
 				Token::Parenthesis(')'),
@@ -218,5 +309,36 @@ mod tests {
 				Token::Operand(Variable::String("b".to_string())),
 			]
 		);
+	}
+
+	#[test]
+	fn test_expr_tokens_to_rpn() {
+		let tokens = vec![
+			Token::Operand(Variable::Number(5)),
+			Token::Operation(Operator::Addition),
+			Token::Operand(Variable::Number(3)),
+			Token::Operation(Operator::Multiplication),
+			Token::Operand(Variable::Number(2)),
+		];
+		let rpn = expr_tokens_to_rpn(tokens);
+		assert_eq!(
+			rpn,
+			vec![
+				Token::Operand(Variable::Number(5)),
+				Token::Operand(Variable::Number(3)),
+				Token::Operand(Variable::Number(2)),
+				Token::Operation(Operator::Multiplication),
+				Token::Operation(Operator::Addition),
+			]
+		);
+	}
+
+	#[test]
+	fn test_evaluate() {
+		let expr = "5 + 3 * 2";
+		let tokens = Token::from_string(expr);
+		let rpn = expr_tokens_to_rpn(tokens);
+		let result = evaluate_rpn(rpn);
+		assert_eq!(result, Variable::Number(11));
 	}
 }
