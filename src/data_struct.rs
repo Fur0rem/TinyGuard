@@ -18,6 +18,24 @@ enum Identifier {
 	Variable { name: String },
 }
 
+impl Identifier {
+	fn var(name: &str) -> Identifier {
+		Identifier::Variable { name: name.to_string() }
+	}
+
+	fn const_bool(b: bool) -> Identifier {
+		Identifier::Constant(Constant::Bool(b))
+	}
+
+	fn const_num(n: i32) -> Identifier {
+		Identifier::Constant(Constant::Number(n))
+	}
+
+	fn const_str(s: &str) -> Identifier {
+		Identifier::Constant(Constant::String(s.to_string()))
+	}
+}
+
 #[derive(Debug, PartialEq)]
 enum Operator {
 	Addition,
@@ -304,12 +322,12 @@ mod tests {
 				Token::Operation(Operator::Not),
 				Token::Parenthesis('('),
 				Token::Parenthesis('('),
-				Token::Operand(Identifier::Variable { name: "a".to_string() }),
+				Token::Operand(Identifier::var("a")),
 				Token::Operation(Operator::Addition),
-				Token::Operand(Identifier::Constant(Constant::Number(5))),
+				Token::Operand(Identifier::const_num(5)),
 				Token::Parenthesis(')'),
 				Token::Operation(Operator::Equals),
-				Token::Operand(Identifier::Variable { name: "c".to_string() }),
+				Token::Operand(Identifier::var("c")),
 				Token::Parenthesis(')'),
 			]
 		);
@@ -321,10 +339,7 @@ mod tests {
 		let tokens = Token::from_string(expression);
 		assert_eq!(
 			tokens,
-			vec![
-				Token::Operation(Operator::UnaryMinus),
-				Token::Operand(Identifier::Constant(Constant::Number(5)))
-			]
+			vec![Token::Operation(Operator::UnaryMinus), Token::Operand(Identifier::const_num(5)),]
 		);
 	}
 
@@ -335,10 +350,10 @@ mod tests {
 		assert_eq!(
 			tokens,
 			vec![
-				Token::Operand(Identifier::Constant(Constant::Number(5))),
+				Token::Operand(Identifier::const_num(5)),
 				Token::Operation(Operator::Multiplication),
 				Token::Operation(Operator::UnaryMinus),
-				Token::Operand(Identifier::Constant(Constant::Number(5)))
+				Token::Operand(Identifier::const_num(5)),
 			]
 		);
 	}
@@ -350,11 +365,11 @@ mod tests {
 		assert_eq!(
 			tokens,
 			vec![
-				Token::Operand(Identifier::Variable { name: "a".to_string() }),
+				Token::Operand(Identifier::var("a")),
 				Token::Operation(Operator::Addition),
-				Token::Operand(Identifier::Constant(Constant::Number(5))),
+				Token::Operand(Identifier::const_num(5)),
 				Token::Operation(Operator::Addition),
-				Token::Operand(Identifier::Variable { name: "b".to_string() }),
+				Token::Operand(Identifier::var("b")),
 			]
 		);
 	}
@@ -362,19 +377,19 @@ mod tests {
 	#[test]
 	fn test_expr_tokens_to_rpn() {
 		let tokens = vec![
-			Token::Operand(Identifier::Constant(Constant::Number(5))),
+			Token::Operand(Identifier::const_num(5)),
 			Token::Operation(Operator::Addition),
-			Token::Operand(Identifier::Constant(Constant::Number(3))),
+			Token::Operand(Identifier::const_num(3)),
 			Token::Operation(Operator::Multiplication),
-			Token::Operand(Identifier::Constant(Constant::Number(2))),
+			Token::Operand(Identifier::const_num(2)),
 		];
 		let rpn = expr_tokens_to_rpn(tokens);
 		assert_eq!(
 			rpn,
 			vec![
-				Token::Operand(Identifier::Constant(Constant::Number(5))),
-				Token::Operand(Identifier::Constant(Constant::Number(3))),
-				Token::Operand(Identifier::Constant(Constant::Number(2))),
+				Token::Operand(Identifier::const_num(5)),
+				Token::Operand(Identifier::const_num(3)),
+				Token::Operand(Identifier::const_num(2)),
 				Token::Operation(Operator::Multiplication),
 				Token::Operation(Operator::Addition),
 			]
@@ -387,6 +402,6 @@ mod tests {
 		let tokens = Token::from_string(expr);
 		let rpn = expr_tokens_to_rpn(tokens);
 		let result = evaluate_rpn(rpn);
-		assert_eq!(result, Identifier::Constant(Constant::Number(11)));
+		assert_eq!(result, Identifier::const_num(11));
 	}
 }
