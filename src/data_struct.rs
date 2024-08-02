@@ -203,4 +203,20 @@ mod tests {
 			]
 		);
 	}
+
+	#[test]
+	fn test_tokenise_variables() {
+		let expression = "a + 5 + b";
+		let tokens = Token::from_string(expression);
+		assert_eq!(
+			tokens,
+			vec![
+				Token::Operand(Variable::String("a".to_string())),
+				Token::Operation(Operator::Addition),
+				Token::Operand(Variable::Number(5)),
+				Token::Operation(Operator::Addition),
+				Token::Operand(Variable::String("b".to_string())),
+			]
+		);
+	}
 }
