@@ -1,12 +1,12 @@
 #[derive(Debug, PartialEq)]
-enum VariableTypes {
+pub enum VariableType {
 	Bool,
 	Number,
 	String,
 }
 
 #[derive(Debug, PartialEq)]
-enum Constant {
+pub enum Constant {
 	Bool(bool),
 	Number(i32),
 	String(String),
@@ -51,14 +51,14 @@ enum Operator {
 
 #[derive(Debug, PartialEq)]
 enum ArityAndTypes {
-	Unary(VariableTypes),
-	Binary(VariableTypes, VariableTypes),
+	Unary(VariableType),
+	Binary(VariableType, VariableType),
 }
 
 impl Operator {
 	fn arity_and_types(&self) -> ArityAndTypes {
 		use Operator::*;
-		use VariableTypes::*;
+		use VariableType::*;
 		match self {
 			Addition | Substraction | Multiplication | Division => ArityAndTypes::Binary(Number, Number),
 			UnaryMinus => ArityAndTypes::Unary(Number),
@@ -98,7 +98,7 @@ impl Operator {
 }
 
 #[derive(Debug, PartialEq)]
-enum Token {
+pub enum Token {
 	Parenthesis(char),
 	Operand(Identifier),
 	Operation(Operator),
@@ -187,7 +187,9 @@ impl Token {
 	}
 }
 
-fn expr_tokens_to_rpn(tokens: Vec<Token>) -> Vec<Token> {
+pub type EvaluableExpr = Vec<Token>;
+
+fn expr_tokens_to_rpn(tokens: Vec<Token>) -> EvaluableExpr {
 	let mut output = Vec::new();
 	let mut stack = Vec::new();
 	for token in tokens {
@@ -226,7 +228,7 @@ fn expr_tokens_to_rpn(tokens: Vec<Token>) -> Vec<Token> {
 	return output;
 }
 
-fn evaluate_rpn(tokens: Vec<Token>) -> Identifier {
+fn evaluate_rpn(tokens: EvaluableExpr) -> Identifier {
 	let mut stack = Vec::new();
 	for token in tokens {
 		match token {
@@ -289,6 +291,129 @@ fn evaluate_rpn(tokens: Vec<Token>) -> Identifier {
 		}
 	}
 	return stack.pop().unwrap();
+}
+
+pub struct MetaData {
+	pub name: String,
+	pub data: Constant,
+}
+
+impl MetaData {
+	pub fn from_string(s: &str) -> MetaData {
+		// name: type = value
+		let parts: Vec<&str> = s.split(":").collect();
+		let name = parts[0].trim().to_string();
+		let parts: Vec<&str> = parts[1].split("=").collect();
+		let data_type = parts[0].trim();
+		let data = parts[1].trim();
+		let data = if data.starts_with('"') {
+			Constant::String(data[1..data.len() - 1].to_string())
+		} else if data == "true" {
+			Constant::Bool(true)
+		} else if data == "false" {
+			Constant::Bool(false)
+		} else {
+			Constant::Number(data.parse().unwrap())
+		};
+		if data_type == "bool" && !matches!(data, Constant::Bool(_)) {
+			panic!("Invalid data type for {}: {:?}", name, data);
+		}
+		if data_type == "number" && !matches!(data, Constant::Number(_)) {
+			panic!("Invalid data type for {}: {:?}", name, data);
+		}
+		if data_type == "string" && !matches!(data, Constant::String(_)) {
+			panic!("Invalid data type for {}: {:?}", name, data);
+		}
+		return MetaData { name, data };
+	}
+}
+
+pub struct Assignement {
+	pub name: String,
+	pub value: EvaluableExpr,
+}
+
+impl Assignement {
+	pub fn from_string(s: &str) -> Assignement {
+		let parts: Vec<&str> = s.split("=").collect();
+		let name = parts[0].trim().to_string();
+		let value = parts[1].trim();
+		let tokens = Token::from_string(value);
+		let rpn = expr_tokens_to_rpn(tokens);
+		return Assignement { name, value: rpn };
+	}
+}
+
+pub struct Warning {
+	pub test: EvaluableExpr,
+	pub message: Option<String>,
+	pub hint: Option<String>,
+}
+
+impl Warning {
+	/*Format:
+	{
+		Test: "a + 5 == c",
+		Message: "a + 5 should be equal to c",
+		Hint: "Check the value of a and c"
+	}
+	Message and Hints are optional
+	*/
+	pub fn from_string(s: &str) -> Warning {
+		let parts: Vec<&str> = s.split(",").collect();
+		let mut test = None;
+		let mut message = None;
+		let mut hint = None;
+		for part in &parts {
+			let part = part.trim();
+			if part.starts_with("Test") {
+				let split = part.split(":").collect::<Vec<&str>>();
+				let test_expr = split[1].trim();
+				let tokens = Token::from_string(test_expr);
+				let rpn = expr_tokens_to_rpn(tokens);
+				if test.is_some() {
+					panic!("Multiple tests in warning");
+				}
+				test = Some(rpn);
+			}
+			if part.starts_with("Message") {
+				let split = part.split(":").collect::<Vec<&str>>();
+				if message.is_some() {
+					panic!("Multiple messages in warning");
+				}
+				message = Some(split[1].trim().to_string());
+			}
+			if part.starts_with("Hint") {
+				let split = part.split(":").collect::<Vec<&str>>();
+				if hint.is_some() {
+					panic!("Multiple hints in warning");
+				}
+				hint = Some(split[1].trim().to_string());
+			}
+		}
+		return Warning {
+			test: test.unwrap(),
+			message,
+			hint,
+		};
+	}
+}
+
+pub type Deny = Warning;
+
+pub struct Call {
+	pub name: String,
+	pub does: Option<Vec<Assignement>>,
+	pub warn: Option<Vec<Warning>>,
+	pub deny: Option<Vec<Deny>>,
+}
+
+pub struct DataStruct {
+	pub name: String,
+	pub constructors: Vec<String>,
+	pub destructors: Vec<String>,
+	pub meta_data: Vec<MetaData>,
+	pub calls: Vec<Call>,
 }
 
 fn print_tokens(tokens: Vec<Token>) {
@@ -403,5 +528,61 @@ mod tests {
 		let rpn = expr_tokens_to_rpn(tokens);
 		let result = evaluate_rpn(rpn);
 		assert_eq!(result, Identifier::const_num(11));
+	}
+
+	#[test]
+	fn test_parse_meta_data() {
+		let meta_data = MetaData::from_string("name: number = 5");
+		assert_eq!(meta_data.name, "name");
+		assert_eq!(meta_data.data, Constant::Number(5));
+	}
+
+	#[test]
+	fn test_parse_assignement() {
+		let assignement = Assignement::from_string("name = 5 + 3 * 2");
+		assert_eq!(assignement.name, "name");
+		assert_eq!(
+			assignement.value,
+			vec![
+				Token::Operand(Identifier::const_num(5)),
+				Token::Operand(Identifier::const_num(3)),
+				Token::Operand(Identifier::const_num(2)),
+				Token::Operation(Operator::Multiplication),
+				Token::Operation(Operator::Addition),
+			]
+		);
+	}
+
+	#[test]
+	fn test_parse_warning() {
+		let warning = Warning::from_string("Test: a + 5 == c, Message: a + 5 should be equal to c, Hint: Check the value of a and c");
+		assert_eq!(
+			warning.test,
+			vec![
+				Token::Operand(Identifier::Variable { name: "a".to_string() }),
+				Token::Operand(Identifier::const_num(5)),
+				Token::Operation(Operator::Addition),
+				Token::Operand(Identifier::Variable { name: "c".to_string() }),
+				Token::Operation(Operator::Equals),
+			]
+		);
+		assert_eq!(warning.message, Some("a + 5 should be equal to c".to_string()));
+		assert_eq!(warning.hint, Some("Check the value of a and c".to_string()));
+	}
+
+	#[test]
+	fn test_parse_does() {
+		let does = Assignement::from_string("name = 5 + 3 * 2");
+		assert!(does.name == "name");
+		assert_eq!(
+			does.value,
+			vec![
+				Token::Operand(Identifier::const_num(5)),
+				Token::Operand(Identifier::const_num(3)),
+				Token::Operand(Identifier::const_num(2)),
+				Token::Operation(Operator::Multiplication),
+				Token::Operation(Operator::Addition),
+			]
+		);
 	}
 }
