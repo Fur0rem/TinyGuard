@@ -1,3 +1,4 @@
+mod ast;
 mod data_struct;
 mod parser;
 
@@ -21,4 +22,11 @@ fn main() {
 		.map(|brack| parser::fill_blanks(brack, &guard_file))
 		.collect::<Vec<_>>();
 	println!("{:#?}", brack);
+
+	let tree = ast::parse_ast("samples/main.c");
+	ast::print_tree(tree.root_node(), &code, 0);
+	let variables = ast::parse_variables(tree, &code);
+	for variable in variables {
+		ast::print_variable(&variable, &code);
+	}
 }

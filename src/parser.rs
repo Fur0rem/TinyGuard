@@ -1,7 +1,7 @@
 use either::{self, Either};
 
 #[derive(Debug, Clone)]
-struct FileLine {
+pub struct FileLine {
 	line_number: usize,
 	line: String,
 }
@@ -47,7 +47,8 @@ pub fn parse_bracketed(file: &str) -> Vec<Bracketed> {
 				FileLine::new(line_number, line.to_string()),
 				Either::Left("".to_string()),
 			));
-		} else if line.contains("}") {
+		}
+		else if line.contains("}") {
 			let beginning_line = stack.pop().unwrap();
 			let ending_line = FileLine::new(line_number, line.to_string());
 			let mut content = Vec::new();
@@ -55,7 +56,8 @@ pub fn parse_bracketed(file: &str) -> Vec<Bracketed> {
 				if bracketed.beginning_line.line_number == beginning_line.line_number {
 					bracketed_vec.push(Bracketed::new(beginning_line, ending_line, Either::Right(content)));
 					break;
-				} else {
+				}
+				else {
 					content.push(bracketed);
 				}
 			}

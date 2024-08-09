@@ -127,7 +127,8 @@ impl Token {
 					i += 1;
 				}
 				tokens.push(Token::Operand(Identifier::Constant(Constant::Number(number.parse().unwrap()))));
-			} else if c == '"' {
+			}
+			else if c == '"' {
 				let mut string = String::new();
 				i += 1;
 				while i < expr.len() && expr.chars().nth(i).unwrap() != '"' {
@@ -136,7 +137,8 @@ impl Token {
 				}
 				tokens.push(Token::Operand(Identifier::Constant(Constant::String(string))));
 				i += 1;
-			} else if c.is_alphabetic() {
+			}
+			else if c.is_alphabetic() {
 				let mut string = c.to_string();
 				i += 1;
 				while i < expr.len() && expr.chars().nth(i).unwrap().is_alphabetic() {
@@ -144,10 +146,12 @@ impl Token {
 					i += 1;
 				}
 				tokens.push(Token::Operand(Identifier::Variable { name: string }));
-			} else if c == '(' || c == ')' {
+			}
+			else if c == '(' || c == ')' {
 				tokens.push(Token::Parenthesis(c));
 				i += 1;
-			} else {
+			}
+			else {
 				let mut op = c.to_string();
 				let begin = i;
 				let mut end = i + 1;
@@ -200,10 +204,12 @@ fn expr_tokens_to_rpn(tokens: Vec<Token>) -> EvaluableExpr {
 					if let Token::Operation(top_op) = top {
 						if top_op.priority() >= op.priority() {
 							output.push(stack.pop().unwrap());
-						} else {
+						}
+						else {
 							break;
 						}
-					} else {
+					}
+					else {
 						break;
 					}
 				}
@@ -214,7 +220,8 @@ fn expr_tokens_to_rpn(tokens: Vec<Token>) -> EvaluableExpr {
 				while let Some(top) = stack.pop() {
 					if let Token::Parenthesis('(') = top {
 						break;
-					} else {
+					}
+					else {
 						output.push(top);
 					}
 				}
@@ -308,11 +315,14 @@ impl MetaData {
 		let data = parts[1].trim();
 		let data = if data.starts_with('"') {
 			Constant::String(data[1..data.len() - 1].to_string())
-		} else if data == "true" {
+		}
+		else if data == "true" {
 			Constant::Bool(true)
-		} else if data == "false" {
+		}
+		else if data == "false" {
 			Constant::Bool(false)
-		} else {
+		}
+		else {
 			Constant::Number(data.parse().unwrap())
 		};
 		if data_type == "bool" && !matches!(data, Constant::Bool(_)) {
