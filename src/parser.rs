@@ -1,9 +1,9 @@
 use either::{self, Either};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FileLine {
-	line_number: usize,
-	line: String,
+	pub line_number: usize,
+	pub line: String,
 }
 
 impl FileLine {
@@ -19,10 +19,10 @@ impl FileLine {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Bracketed {
-	beginning_line: FileLine,
-	ending_line: FileLine,
+	pub beginning_line: FileLine,
+	pub ending_line: FileLine,
 	pub content: Either<String, Vec<Bracketed>>,
 }
 
@@ -36,10 +36,12 @@ impl Bracketed {
 	}
 }
 
-pub fn parse_bracketed(file: &str) -> Vec<Bracketed> {
+// pub fn fill_in_between(b: &mut Vec<Bracketed>, content: &str)
+
+pub fn parse_bracketed(content: &str) -> Vec<Bracketed> {
 	let mut stack = Vec::new();
 	let mut bracketed_vec = Vec::new();
-	for (line_number, line) in file.lines().enumerate() {
+	for (line_number, line) in content.lines().enumerate() {
 		if line.contains("{") {
 			stack.push(FileLine::new(line_number, line.to_string()));
 			bracketed_vec.push(Bracketed::new(
@@ -88,7 +90,9 @@ pub fn fill_blanks(bracketed: &Bracketed, text: &str) -> Bracketed {
 		}
 		Either::Right(ref vec) => {
 			let mut new_vec = Vec::new();
+			println!("VEC: {:#?}", vec);
 			if vec.is_empty() {
+				println!("EMPTY");
 				let lines = text.lines().map(|line| line.to_string()).collect::<Vec<_>>();
 				let mut new_text = String::new();
 				for line in lines
@@ -100,6 +104,7 @@ pub fn fill_blanks(bracketed: &Bracketed, text: &str) -> Bracketed {
 					new_text.push_str(line);
 					new_text.push_str("\n");
 				}
+				println!("NEW TEXT: {:?}", new_text);
 				return Bracketed::new(
 					bracketed.beginning_line.clone().trimmed(),
 					bracketed.ending_line.clone().trimmed(),

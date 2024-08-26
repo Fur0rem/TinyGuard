@@ -26,7 +26,7 @@ DataStruct IntVector {
                 {
                     Test: sorted == true,
                     Message: "Using search on an sorted vector is very inefficient",
-                    Hint: "Use IntVector_binary_search(&$self, ...) instead"                
+                    Hint: "Use IntVector_binary_search(&$self, ...) instead",             
                 }
             }
         }

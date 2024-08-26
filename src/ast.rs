@@ -1,11 +1,12 @@
-use tree_sitter::{self, Language, Parser, Tree};
+use tree_sitter::{self, Language, Node, Parser, Tree};
 use tree_sitter_c;
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProgramVariable {
-	name: String,
-	var_type: String,
-	implications: Vec<(usize, usize)>, // (start_byte, end_byte)
-	scope: (usize, usize),             // (start_byte, end_byte)
+	pub name: String,
+	pub var_type: String,
+	pub implications: Vec<(usize, usize)>, // (start_byte, end_byte)
+	pub scope: (usize, usize),             // (start_byte, end_byte)
 }
 
 pub fn parse_ast(file: &str) -> Tree {
@@ -23,9 +24,7 @@ pub fn print_tree(node: tree_sitter::Node, source_code: &str, depth: usize) {
 	let start_position = node.start_position();
 	let end_position = node.end_position();
 	let kind = node.kind();
-	let kind_id = node.kind_id();
 	let is_named = node.is_named();
-	let has_error = node.has_error();
 	let child_count = node.child_count();
 	let is_child = child_count > 0;
 
@@ -48,7 +47,7 @@ pub fn print_tree(node: tree_sitter::Node, source_code: &str, depth: usize) {
 	}
 }
 
-pub fn parse_variables(tree: Tree, source_code: &str) -> Vec<ProgramVariable> {
+pub fn parse_variables(tree: &Tree, source_code: &str) -> Vec<ProgramVariable> {
 	let mut variables = Vec::new();
 	let root_node = tree.root_node();
 	let mut stack = Vec::new();
@@ -85,6 +84,7 @@ pub fn parse_variables(tree: Tree, source_code: &str) -> Vec<ProgramVariable> {
 							let equal_sign = expr.rfind('=').unwrap();
 							println!("expr : {:?}", expr);
 							println!("text : {:?}", text);
+							let expr = &expr[..equal_sign].trim();
 							variable.name = expr.trim().to_string();
 							// find the type by looking at the name
 							let index_of_name = text.find(&variable.name).unwrap();
@@ -142,4 +142,48 @@ pub fn print_variables(variable: &ProgramVariable, source_code: &str) {
 		let text = &source_code[*start_byte..*end_byte];
 		println!("  Implication: {}", text);
 	}
+}
+
+pub fn entry_point_c<'a>(tree: &'a tree_sitter::Tree, source_code: &str) -> tree_sitter::Node<'a> {
+	// find main()
+	let mut main = None;
+	let mut stack = vec![tree.root_node()];
+	while let Some(node) = stack.pop() {
+		if node.kind() == "function_definition" {
+			// println!("FOUND FUNCTION DEFINITION");
+			// print_tree(node, source_code, 0);
+			// print all the children
+			// for i in 0..node.child_count() {
+			//     let child = node.child(i).unwrap();
+			//     println!("child {}: {}, {}", i, child.kind(), child.kind_id());
+			// }
+			let mut good_child = None;
+			for i in 0..node.child_count() {
+				let child = node.child(i).unwrap();
+				if child.kind() == "function_declarator" {
+					good_child = Some(child);
+					break;
+				}
+			}
+			let child = good_child.unwrap();
+			let text = &source_code[child.start_byte()..child.end_byte()];
+			// remove everything after the first '('
+			let text = text.split('(').next().unwrap();
+			// remove the first word
+			let text = text.split_whitespace().last().unwrap();
+			// println!("function name: {}", text);
+			if text == "main" {
+				main = Some(node);
+				break;
+			}
+		}
+
+		let child_count = node.child_count();
+		for i in 0..child_count {
+			let child = node.child(i).unwrap();
+			stack.push(child);
+		}
+	}
+
+	return main.unwrap();
 }
